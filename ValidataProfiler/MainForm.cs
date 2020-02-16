@@ -39,19 +39,22 @@ namespace ValidataProfiler
             foreach (var item in payPoints)
             {
                 PointsList.Items.Add(item.Result.PayPointId);
+                PointsDataGrid.Rows.Add(item.Result.PayPointId, item.Result.PostIndex, "", "");
             }
-            PointsList.SelectedIndex = 0;
         }
 
         private async void CreateCertRequest()
         {
-            foreach (var item in PointsList.Items)
+            var lastKeyFile = "";
+            foreach (var item in PointsDataGrid.Rows)
             {
-                var point = item.ToString();
-                Debug.WriteLine(DateTime.Now + " * пункт " + point + " * выбран.");
-                var basePath = @"d:\!!!Валидата!!!\Справочники\" + point;
+                var row = (DataGridViewRow)item;
+                var point = row.Cells["Point"].Value;
+                Log($"* пункт {point} * выбран.");
+                var basePath = $@"d:\!!!Валидата!!!\Справочники\{point}";
                 if (System.IO.File.Exists(basePath + @"\local.gdbm"))
                 {
+                    Log($"* пункт {point} * файлы справочника сертификатов доступны.");
                     var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Validata\zpki\Profiles\0\", true);
 
                     key.SetValue("BasePath", basePath);
@@ -79,13 +82,34 @@ namespace ValidataProfiler
                     var file = directory.GetFiles()
                                  .OrderByDescending(f => f.LastWriteTime)
                                  .First();
-                    file.CopyTo(Path.Combine(basePath, file.Name));
+                    if (lastKeyFile != file.Name)
+                    {
+                        file.CopyTo(Path.Combine(basePath, file.Name));
+                        Log($"* пункт {point} * закрытый ключ {file.Name} скопирован.");
+                        row.Cells["KeyFile"].Value = file.Name;
+                    }
+                    else
+                    {
+                        Log($"* пункт {point} * закрытый ключ НЕ найден.");
+                    }
 
                     SendKeys.SendWait("%{F4}");
                     SendKeys.SendWait("{ENTER}");
                     await Task.Delay(3000);
                 }
+                else
+                {
+                    Log($"* пункт {point} * файлы справочника сертификатов НЕДОСТУПНЫ.");
+                    Log($"* пункт {point} * запрос на сертификат НЕ создан.");
+                }
             }
+        }
+        private void Log(string message)
+        {
+            var result = DateTime.Now + " " + message;
+
+            ResultText.AppendText($"{result}\n");
+            Debug.WriteLine(message);
         }
     }
 }
